@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "Tanpura",
+    "slug": "tanpura",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "tanpura",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ofaal.tanpura"
+    },
+    "android": {
+      "package": "com.ofaal.tanpura",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "extra": {
+      "supabaseUrl": "",
+      "supabaseAnonKey": ""
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-status-bar"
+    ]
+  }
+}

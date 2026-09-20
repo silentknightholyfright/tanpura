@@ -64,10 +64,10 @@ There are four roles in the system. All users share a single `Users` table with 
 - Can view their own schedule
 
 ### 3.3 Parent
-- Parents do not have a separate login — they are linked to a student profile and use the student's login credentials
-- Can view lesson schedule, attendance history, and invoices for their linked child
-- Receives push notifications and WhatsApp invoice messages
-- A student can have multiple parents/guardians linked to their profile; one is flagged as the primary invoice recipient
+- Parents do not have their own login. They are linked to a student profile; the student's login is the single credential for the family.
+- Parent contact details (name, WhatsApp number, preferred language) are stored on the `Parents` record and linked to the student via `Student_Parents`.
+- A student can have multiple parents/guardians linked to their profile; one is flagged as the primary invoice recipient.
+- Parents receive WhatsApp invoice messages and push notifications via the student's registered push token (i.e. on the shared device).
 
 ### 3.4 Student
 - Can view their own schedule and attendance
@@ -413,7 +413,7 @@ Implemented using Supabase Row Level Security (RLS).
 |---|---|---|---|
 | 1 | What is the default reminder timing before a lesson? | ✅ Decided | 12 hours before |
 | 2 | Should overdue invoices trigger an automatic WhatsApp reminder? | ✅ Decided | Yes |
-| 3 | Do students need their own login, or is access parent-only for younger students? | ✅ Decided | Students log in; parents are linked on the student profile and use the student login |
+| 3 | Do students need their own login, or is access parent-only for younger students? | ✅ Decided | Students log in. Parents have no separate login — they are linked to the student profile. The student's credentials are the single family login. |
 | 4 | Is there a maximum class size per group lesson template? | ✅ Decided | 10 by default; can be amended per lesson instance by teacher or admin |
 | 5 | Should the app support multiple currencies, or GBP only? | ✅ Decided | GBP only |
 | 6 | Are makeup lessons billed at the same rate as regular lessons? | ✅ Decided | Yes |
