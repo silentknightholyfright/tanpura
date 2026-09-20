@@ -1,8 +1,9 @@
 # Phase 2 Readiness Brief — Tanpura
 
 > **Prepared:** May 2026
-> **Status:** Ready to build
-> **Phase 2 scope:** Scheduling & Operations — lesson instances, attendance, fee overrides, cancellations, one-off lessons, push notifications
+> **Last updated:** September 2026
+> **Status:** Phase 2 complete
+> **Phase 2 scope:** Scheduling & Operations — lesson instances, attendance, fee overrides, cancellations, one-off lessons, push notifications; plus parent auth accounts and parent add-child flow
 
 ---
 
@@ -25,23 +26,29 @@ These were open or ambiguous in the spec; all are now settled:
 
 | # | Decision | Resolution |
 |---|---|---|
-| C1 | Parent identity model | **Option A** — parents have no separate login. The student's credentials are the single family login. Parent contact details live on the `Parents` record (no `user_id` FK). See `DOCS/ADR/ADR-001-parent-identity-model.md`. |
-| C2 | Push token collision | Resolved by C1: one push token per family (student's device). WhatsApp is the out-of-band channel for parents. |
+| C1 | Parent identity model | **Option B** (revised Sept 2026) — parents have their own Supabase Auth accounts. `parents.user_id` → `users`. New parent accounts are gated by `is_approved = false` until admin approves. This reverses the original Option A decision; see `DOCS/ADR/ADR-001-parent-identity-model.md` for the full rationale. |
+| C2 | Push token collision | Each parent has their own push token (their own auth account). WhatsApp remains the out-of-band invoice channel via `whatsapp_number`. |
 | C3 | Ad-hoc attendee pricing | `CHECK` constraint in `attendance`: when `is_adhoc = true`, `override_price` must be set. App must prompt for a price when adding an ad-hoc student. |
 | C4 | Academic calendar | `calendar_days` table added in `0003_phase2_schema.sql`. Instance-generation worker must call `is_school_open(date)` before creating each instance. |
 | I5 | Auth mechanism | Email + password for students, teachers, and admins. Parents have no login. |
 | I6 | Users ↔ auth.users | `Users.id` = `auth.users.id`; mirrored via trigger. |
 | I7 | Soft-delete policy | `is_active` flags; no hard deletes on entities referenced by historical records. |
 
-### Still open before Phase 2 build starts
+### Phase 2 completion status (September 2026)
 
-| # | Issue | Action needed |
+| Item | Status | Notes |
 |---|---|---|
-| ADR-001 corrective migration | Phase 1 schema was built on the Option B assumption | Write `0005_fix_parent_identity.sql`: drop `parents.user_id`, revise parent RLS policies, rewrite `is_student_or_parent_for_instance()`. See ADR-001 Action Items. |
-| Phase 1 CRUD screens | Admin home screen lists feature stubs but no working screens | At minimum, student profiles + enrolment + lesson template CRUD must work before attendance marking makes sense. |
-| Supabase generated types | `src/lib/types.ts` is hand-written | Run `supabase gen types typescript --local > src/lib/database.types.ts` after applying the Phase 2 migrations so Phase 2 screens are type-safe from the start. |
-| I1 — Invoice due date | `Invoices.due_date` not yet in schema | Column will be added in the Phase 3 migration; flag for Phase 3 planning. |
-| I9 — Audit log | Only fee overrides are audited | Consider adding an `audit_log` table in Phase 2 (enrolment status changes, attendance amendments) before there's billing data to protect. |
+| ADR-001 corrective migration (`0005`) | ✅ Done | `parents.user_id` dropped, parent RLS revised |
+| Phase 1 CRUD screens | ✅ Done | Students, enrolments, lesson templates |
+| Lesson instance generation | ✅ Done | `generate_lesson_instances()` + pg_cron (`0008`) |
+| Teacher schedule + attendance screens | ✅ Done | `TeacherScheduleScreen`, `AttendanceScreen` |
+| Parent auth accounts | ✅ Done | Migration `0011`; sign-up flow with role selector; `is_approved` gating |
+| Parent add-child flow | ✅ Done | Migration `0012`; `add_my_child()` RPC; `ParentAddChildScreen`; admin approval UI |
+| Expo SDK upgrade to 57 | ✅ Done | Fixes Xcode 27 / DeviceHub issue |
+| Cloud Supabase migration | ✅ Done | Replaced local Supabase; resolves iOS ATS / HTTP connectivity |
+| Supabase generated types | ⏳ Tech debt | `src/lib/types.ts` still hand-written; generate from cloud project in Phase 3 |
+| I1 — Invoice due date | ⏳ Phase 3 | `Invoices.due_date` column deferred |
+| I9 — Audit log | ⏳ Phase 3 | Only fee overrides audited so far |
 
 ---
 

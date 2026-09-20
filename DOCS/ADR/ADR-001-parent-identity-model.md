@@ -1,8 +1,9 @@
 # ADR-001: Parent identity model
 
-**Status:** Accepted
+**Status:** Superseded — see revision note below
 **Date:** 2026-05-04
 **Accepted:** May 2026
+**Revised:** September 2026
 **Deciders:** Tanpura product owner; OFAAL school administrator
 **Related:** `DOCS/SPEC.md` §3.3, §4.2, Open Question #3 · `DOCS/SPEC_REVIEW.md` C1, C2
 
@@ -35,11 +36,28 @@ The school has 100+ active students, the majority of whom are minors with one or
 
 ## Decision
 
-**Adopt Option A: parents have no separate login. The student's Supabase Auth account is the single credential for the family.**
+**Original (May 2026): Option A** — parents have no separate login; student credentials are shared family credentials.
 
-Parent contact details (name, WhatsApp number, preferred language) are stored on the `Parents` record and linked to the student via `Student_Parents`. The `Parents` table does **not** carry a `user_id` FK — parents are not auth users.
+---
 
-> **Note — schema correction required:** The Phase 1 schema (`0001_phase1_schema.sql`) was scaffolded with `Parents.user_id → Users` (Option B assumption) and a `parent` enum value in `user_role`. Both must be removed or left unused. A corrective migration is needed before Phase 2 screens are built. See Consequences below.
+> ### ⚠️ Revision — September 2026
+>
+> **The original Option A decision was reversed during Phase 2 build.** Migration `0011_parent_auth_accounts.sql` re-added `parents.user_id → users` and introduced a `parent` role in the auth flow, implementing **Option B** in practice.
+>
+> **Why the reversal happened:**
+> - The parent add-child flow (migration `0012`) required the app to know *which parent* is submitting a child for approval. Without a parent auth identity, `auth.uid()` cannot be used to look up the parent record and create the `student_parents` link securely.
+> - The `SECURITY DEFINER` RPC `add_my_child()` relies on `auth.uid()` resolving to a `parents.user_id` row to validate the caller is an approved parent.
+> - Push notification routing and future WhatsApp delivery per-parent also become cleaner with separate identities.
+>
+> **Current state (what is actually implemented):**
+> - Parents register with their own email + password via the sign-up screen (role selector → "Parent").
+> - New parent accounts land with `is_approved = false`; admin must approve before the parent can use the app.
+> - `parents.user_id` is a nullable FK to `public.users`; it is set when the parent has an auth account.
+> - Younger children submitted by parents are created with `pending_review = true` and no `user_id` on their `students` row — they are not auth users until an admin creates an account for them.
+>
+> **Original Option A rationale below is preserved for historical context.**
+
+---
 
 ---
 
@@ -148,14 +166,11 @@ Billing accountability is maintained via admin and teacher audit fields (`overri
 
 ## Action Items
 
-- [x] Update `SPEC.md` §3.3 to describe the shared-login model accurately.
-- [x] Update `SPEC.md` Open Question #3 with the resolved decision.
-- [x] Write corrective migration `0005_fix_parent_identity.sql`:
-  - Dropped `parents.user_id` column (FK and unique index dropped automatically).
-  - `parent` enum value left in place — Postgres cannot drop enum values without a full table rebuild; it is simply never assigned.
-  - Dropped `parents_select_self_or_admin` and `parents_update_self` RLS policies; replaced with `parents_select_admin_teacher_or_student`.
-  - Dropped `is_parent_of_student()` and `is_student_or_parent_for_instance()`; rebuilt all dependent policies using `is_self_student()`.
-- [x] Update `src/lib/types.ts` — `Parent` interface has no `user_id`; Phase 2 types (`LessonInstance`, `Attendance`, `CalendarDay`, etc.) added.
-- [x] Update `AppStack.tsx` — `parent` case removed; `ParentHomeScreen` import removed; comment added explaining why.
-- [x] Update `PHASE2_BRIEF.md` to reflect Option A and replace the "parent invite flow" blocker with the corrective migration item.
-- [ ] When Phase 3 (`Reminders`) is scoped, verify the dispatch worker sends push to the student's token and WhatsApp to the parent's `whatsapp_number` — do not assume a separate parent push token exists.
+- [x] *(Original)* Write corrective migration `0005_fix_parent_identity.sql` — dropped `parents.user_id`, revised RLS.
+- [x] *(Original)* Update `AppStack.tsx` to remove parent routing.
+- [x] *(Revised — Sept 2026)* Migration `0011_parent_auth_accounts.sql` — re-added `parents.user_id`, added parent sign-up flow, approval gating (`is_approved`).
+- [x] *(Revised — Sept 2026)* Migration `0012_parent_add_child.sql` — `pending_review` on students, `add_my_child()` SECURITY DEFINER RPC, `get_my_children()` RPC.
+- [x] *(Revised — Sept 2026)* `AppStack.tsx` updated to include `ParentHomeScreen` and `ParentAddChildScreen`.
+- [x] *(Revised — Sept 2026)* `SPEC.md` updated to reflect Option B (§3.3, §4.2, §4.3, Open Question #3).
+- [x] *(Revised — Sept 2026)* `PHASE2_BRIEF.md` Decision C1 updated.
+- [ ] When Phase 3 (`Reminders`) is scoped, route push to the parent's own push token (now available) and WhatsApp to `whatsapp_number`.

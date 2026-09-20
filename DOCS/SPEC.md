@@ -1,7 +1,7 @@
 # Music School Management App — Product Specification
 
-> **Status:** Draft v1.0  
-> **Last updated:** May 2026  
+> **Status:** Draft v1.1  
+> **Last updated:** September 2026  
 > **Author:** TBD
 
 ---
@@ -29,6 +29,7 @@ A cross-platform app to manage the day-to-day operations of an Oriental Fine Art
 - 100+ active students
 - Lessons are primarily group-based, with some 1-1 sessions
 - Students can be enrolled in multiple instruments simultaneously
+- Instruments taught: **Vocal** and **Violin**
 - Grading follows the **OFAAL (Oriental Fine Arts Academy of London)** board — Grades 1 through 8
 - Payments are received via bank transfer; the app handles invoice generation only
 - Invoices are delivered to parents via WhatsApp using `wa.me` deep links
@@ -64,10 +65,12 @@ There are four roles in the system. All users share a single `Users` table with 
 - Can view their own schedule
 
 ### 3.3 Parent
-- Parents do not have their own login. They are linked to a student profile; the student's login is the single credential for the family.
-- Parent contact details (name, WhatsApp number, preferred language) are stored on the `Parents` record and linked to the student via `Student_Parents`.
-- A student can have multiple parents/guardians linked to their profile; one is flagged as the primary invoice recipient.
-- Parents receive WhatsApp invoice messages and push notifications via the student's registered push token (i.e. on the shared device).
+- Parents have their own Supabase Auth account (email + password). This allows independent push notification routing, per-parent audit trails, and cleaner GDPR consent capture.
+- Parent accounts are subject to admin approval (`is_approved = false` on sign-up; admin flips it to `true`).
+- Parent contact details (name, WhatsApp number, preferred language) are stored on the `Parents` record, linked to their `Users` row via `parents.user_id`.
+- A student can have multiple parents/guardians linked to their profile via `Student_Parents`; one is flagged as the primary invoice recipient.
+- Parents can submit a child for registration through the app. The child is created with `pending_review = true` and must be approved by an admin before becoming a full student record.
+- Parents receive WhatsApp invoice messages and push notifications via their own registered push token.
 
 ### 3.4 Student
 - Can view their own schedule and attendance
@@ -94,19 +97,20 @@ There are four roles in the system. All users share a single `Users` table with 
 #### `Users`
 | Field | Type | Notes |
 |---|---|---|
-| id | uuid PK | |
+| id | uuid PK | Mirrors `auth.users.id` |
 | email | string | |
 | phone | string | |
 | role | enum | `admin` \| `teacher` \| `student` \| `parent` |
 | full_name | string | |
 | push_token | string | For push notifications |
+| is_approved | boolean | Default `false`; admin must approve new sign-ups |
 | created_at | timestamp | |
 
 #### `Parents`
 | Field | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| user_id | uuid FK | → Users |
+| user_id | uuid FK | → Users (nullable; set when parent has an auth account) |
 | whatsapp_number | string | Used for wa.me invoice links |
 | preferred_language | string | |
 
@@ -123,9 +127,12 @@ There are four roles in the system. All users share a single `Users` table with 
 | Field | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| user_id | uuid FK | → Users |
+| user_id | uuid FK | → Users (nullable — younger students may not have an auth account) |
+| full_name | text | Required when `user_id` is null |
+| email | text | Optional; used for future account creation |
 | date_of_birth | date | |
 | emergency_contact | string | |
+| pending_review | boolean | `true` when submitted by a parent and awaiting admin approval |
 
 #### `Student_Parents`
 Junction table linking students to their parents/guardians.
@@ -282,8 +289,9 @@ One row per lesson attended within the billing period. `unit_price` is a snapsho
 
 ## 5. Core Features & Functions
 
-### 5.1 Student & Parent Management *(Phase 1)*
-- Create, edit, and deactivate student profiles
+### 5.1 Student & Parent Management *(Phase 1 / Phase 2)*
+- Create, edit, and deactivate student profiles (admin direct-add, or parent submission via app)
+- Parents can register and submit a child via the app; child lands with `pending_review = true` pending admin approval
 - Link one or more parents/guardians to a student; flag primary invoice recipient
 - Enrol a student into an instrument with a teacher and OFAAL grade
 - A student can hold multiple active enrolments (different instruments)
@@ -413,7 +421,7 @@ Implemented using Supabase Row Level Security (RLS).
 |---|---|---|---|
 | 1 | What is the default reminder timing before a lesson? | ✅ Decided | 12 hours before |
 | 2 | Should overdue invoices trigger an automatic WhatsApp reminder? | ✅ Decided | Yes |
-| 3 | Do students need their own login, or is access parent-only for younger students? | ✅ Decided | Students log in. Parents have no separate login — they are linked to the student profile. The student's credentials are the single family login. |
+| 3 | Do students need their own login, or is access parent-only for younger students? | ✅ Decided | Students log in where they have an account. Parents have their own separate auth accounts. Younger children submitted by parents have no auth account (`user_id` is null on the student row) until the admin creates one. See ADR-001 (revised). |
 | 4 | Is there a maximum class size per group lesson template? | ✅ Decided | 10 by default; can be amended per lesson instance by teacher or admin |
 | 5 | Should the app support multiple currencies, or GBP only? | ✅ Decided | GBP only |
 | 6 | Are makeup lessons billed at the same rate as regular lessons? | ✅ Decided | Yes |
