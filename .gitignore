@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Environment variables — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Supabase local state
+supabase/.temp/
+
+# OS
+.DS_Store
